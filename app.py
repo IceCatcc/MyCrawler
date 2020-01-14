@@ -5,8 +5,9 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-import time,requests,json
+import time,requests,json,configparser
 
+config = configparser.ConfigParser()
 
 ## 浏览器配置
 chrome_options = webdriver.ChromeOptions()
@@ -18,7 +19,7 @@ prefs = {
 }
 chrome_options.add_experimental_option('prefs',prefs)
 ###隐藏浏览器界面
-chrome_options.add_argument('--headless') 
+chrome_options.add_argument('--headless')
 chrome_options.add_argument('--disable-gpu')
 
 ## 驱动配置
@@ -26,20 +27,12 @@ browser = webdriver.Chrome(chrome_options=chrome_options)
 wait=WebDriverWait(browser,10)
 
 try:
-    f=open('last.id','r')
-    rlastid = f.readline().replace('\n','')
-    f.close()
+    config.read("setting.ini")
 except:
-    print('爬取记录文件写入错误')
+    print('配置文件获取错误')
     browser.quit()
-try:
-    f=open("confluence-user-password.conf",'r')
-    confluenceUserName = f.readline().replace('\n','')
-    confluencePassword = f.readline().replace('\n','')
-    f.close()
-except:
-    print('confluence账户信息文件获取错误')
-    browser.quit()
+
+rlastid = config.get('record','lastid')
 
 ##方法定义
 def toIframe1(): #进入iframe
@@ -76,9 +69,9 @@ def Update2Confluence(time,landid,content):
                 }
             }
         }
-    r = requests.post('http://file.znmq.net/rest/api/content/',
+    r = requests.post(config.get('confluence','api_url'),
             data=json.dumps(jsondata),
-            auth=(confluenceUserName,confluencePassword),
+            auth=(config.get('confluence','username'),config.get('confluence','password')),
             headers=({'Content-Type':'application/json;charset=utf-8'})
         )
     return r
@@ -100,7 +93,6 @@ def getContent(): # 获取内容
         TimeoutError
         browser.quit()
     for li in lis:
-        f = open('a.txt','a')
         toIframe2()
         item = obj()
         item.state = li.find_element_by_tag_name('h2').text
@@ -115,10 +107,8 @@ def getContent(): # 获取内容
                 item.information = wait.until(EC.visibility_of_element_located((By.XPATH,'//*[@id="contain"]/div[3]/table/tbody/tr[2]/td[2]/table/tbody/tr[2]/td/table'))).get_attribute('outerHTML').replace('\t','').replace('\n','')
                 print(Update2Confluence(item.transactionTime,item.landid,item.information))
                 #item.print()
-                f.write(str(item.__dict__))
-                f.write('\n')
+                time.sleep(0.1)
                 browser.execute_script('javascript:goReturn();')
-            f.close()
         else:
             return False
    
@@ -137,11 +127,12 @@ browser.execute_script('javascript:window.hide1();')
 browser.execute_script('javascript:window.hide2();')
 
 toIframe2()
+
 try:
-    f=open('last.id','w')
     wlastid = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR,('body > div > div.box > ul > li:nth-child(1) > h3 > em')))).text
-    f.write(wlastid)
-    f.close
+    config['record']['lastid'] = wlastid
+    with open('setting.ini','w') as f:
+        config.write(f)
 except:
     print('爬取记录文件写入错误')
     browser.quit()
@@ -149,7 +140,6 @@ try:
     for i in range(1,30+1): #不重复的情况下最多爬30页
         print('第'+str(i)+'页') #后台输出当前页数
         time.sleep(1)
-        f = open('a.txt','a')
         flag=getContent()
         if flag==False:
             break
@@ -163,5 +153,5 @@ try:
 except Exception as err: #捕获错误，并退出浏览器进程
     print(err)
     browser.quit()
-print('爬取完成')
+print('爬取结束')
 browser.quit()

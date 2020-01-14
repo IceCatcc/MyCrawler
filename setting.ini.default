@@ -1,0 +1,7 @@
+[confluence]
+api_url = http:// /rest/api/content/
+username = 
+password = 
+
+[record]
+lastid = 
